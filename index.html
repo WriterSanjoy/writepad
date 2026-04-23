@@ -1,0 +1,2320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WritePad</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#8a5f20" media="(prefers-color-scheme: light)"/>
+<meta name="theme-color" content="#d4b47a" media="(prefers-color-scheme: dark)"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="WritePad"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@300;400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@300;400;600&family=Noto+Serif+Bengali:wght@400;700&family=Hind+Siliguri:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0f0e0c;
+    --surface: #1a1916;
+    --surface2: #2a2826;
+    --border: #3a3834;
+    --text: #ede9e0;
+    --muted: #a09890;
+    --accent: #d4b47a;
+    --accent2: #9a7a50;
+    --danger: #d47878;
+    --success: #7ad494;
+    --sidebar-w: 260px;
+  }
+
+  body.theme-light {
+    --bg: #faf9f7;
+    --surface: #f0ede8;
+    --surface2: #e4dfd8;
+    --border: #c8c0b4;
+    --text: #1a1814;
+    --muted: #6a6058;
+    --accent: #8a5f20;
+    --accent2: #6a4810;
+    --danger: #a03030;
+    --success: #2a7a42;
+  }
+
+  *, *::before, *::after {
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.15s ease;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+    font-size: 14px;
+  }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s ease;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  #sidebar-header {
+    padding: 20px 16px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #app-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+
+  #app-title span {
+    font-style: italic;
+    opacity: 0.7;
+  }
+
+  #search-wrap {
+    position: relative;
+  }
+
+  #search {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px 7px 30px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  #search:focus { border-color: var(--accent); }
+
+  #search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 11px;
+    pointer-events: none;
+  }
+
+  #notes-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  #notes-list::-webkit-scrollbar { width: 4px; }
+  #notes-list::-webkit-scrollbar-track { background: transparent; }
+  #notes-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .note-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .note-item:hover { background: var(--surface2); }
+
+  .note-item.active {
+    border-left-color: var(--accent);
+    background: var(--surface2);
+  }
+
+  .note-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 3px;
+    font-weight: 600;
+  }
+
+  .note-preview {
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0.65;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .note-date {
+    font-size: 10px;
+    color: var(--text);
+    margin-top: 3px;
+    opacity: 0.55;
+  }
+
+  .note-delete {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+    padding: 4px;
+  }
+
+  .note-item:hover .note-delete { opacity: 1; }
+  .note-delete:hover { color: var(--danger); }
+
+  #sidebar-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  #btn-new {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 9px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 400;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: background 0.2s, transform 0.1s;
+    margin-bottom: 10px;
+  }
+
+  #btn-new:hover { background: #d4b87a; }
+  #btn-new:active { transform: scale(0.98); }
+
+  #sync-section {
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0.75;
+  }
+
+  #sync-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .sync-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .sync-dot.synced { background: var(--success); }
+  .sync-dot.syncing { background: var(--accent); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--danger); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  #btn-pcloud {
+    width: 100%;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 7px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  #btn-pcloud:hover { border-color: var(--accent); color: var(--accent); }
+  #btn-pcloud.connected { border-color: var(--success); color: var(--success); }
+
+  /* ── EDITOR ── */
+  #editor-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .tb-btn {
+    background: none;
+    border: none;
+    color: var(--text);
+    opacity: 0.6;
+    cursor: pointer;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-size: 13px;
+    transition: color 0.15s, background 0.15s, opacity 0.15s;
+    font-family: inherit;
+    letter-spacing: 0.3px;
+  }
+
+  .tb-btn:hover { opacity: 1; background: var(--surface2); }
+  .tb-btn.active { color: var(--accent); }
+
+  #word-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0.55;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  #focus-mode-btn {
+    font-size: 11px;
+  }
+
+  #editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #note-title-input {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    padding: 28px 60px 12px;
+    outline: none;
+    width: 100%;
+    caret-color: var(--accent);
+  }
+
+  #note-title-input::placeholder { color: var(--border); }
+
+  #editor {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    line-height: 1.8;
+    padding: 8px 60px 40px;
+    outline: none;
+    resize: none;
+    overflow-y: auto;
+    caret-color: var(--accent);
+  }
+
+  #editor::-webkit-scrollbar { width: 4px; }
+  #editor::-webkit-scrollbar-thumb { background: var(--border); }
+  #editor::placeholder { color: var(--border); }
+
+  /* ── FOCUS MODE ── */
+  body.focus-mode #sidebar { transform: translateX(-100%); }
+  body.focus-mode #toolbar { opacity: 0; pointer-events: none; }
+  body.focus-mode #editor { padding: 40px max(60px, 15%); font-size: 17px; }
+  body.focus-mode #note-title-input { padding: 40px max(60px, 15%) 16px; font-size: 34px; }
+
+  /* ── EMPTY STATE ── */
+  #empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    gap: 12px;
+  }
+
+  #empty-state h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    color: var(--border);
+  }
+
+  #empty-state p { font-size: 12px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.3s;
+    pointer-events: none;
+    z-index: 100;
+    max-width: 280px;
+  }
+
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── SHORTCUTS PANEL ── */
+  #shortcuts-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,14,12,0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #shortcuts-panel.open { display: flex; }
+
+  #shortcuts-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 32px;
+    min-width: 320px;
+  }
+
+  #shortcuts-box h3 {
+    font-family: 'Playfair Display', serif;
+    color: var(--accent);
+    margin-bottom: 16px;
+    font-size: 18px;
+  }
+
+  .shortcut-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .shortcut-row:last-child { border: none; }
+
+  kbd {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  /* ── PCLOUD MODAL ── */
+  #pcloud-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,14,12,0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #pcloud-modal.open { display: flex; }
+
+  #pcloud-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 32px;
+    min-width: 340px;
+    max-width: 400px;
+  }
+
+  #pcloud-box h3 {
+    font-family: 'Playfair Display', serif;
+    color: var(--accent);
+    margin-bottom: 8px;
+    font-size: 18px;
+  }
+
+  #pcloud-box p {
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .modal-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 12px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+  }
+
+  .modal-input:focus { border-color: var(--accent); }
+
+  .modal-btn {
+    width: 100%;
+    padding: 9px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 8px;
+  }
+
+  .modal-btn.primary {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    font-weight: 500;
+  }
+
+  .modal-btn.primary:hover { background: #d4b87a; }
+
+  .modal-btn.secondary {
+    background: none;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .modal-btn.secondary:hover { border-color: var(--muted); color: var(--text); }
+
+
+  /* ── TAGS ── */
+  .tag-filter-section {
+    padding: 8px 12px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tag-filter-label {
+    font-size: 10px;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    opacity: 0.7;
+    font-weight: 600;
+  }
+  .tag-filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding-bottom: 6px;
+  }
+  .tag-filter-chip {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    background: transparent;
+    font-family: inherit;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tag-filter-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .tag-filter-chip.active { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 500; }
+  .tag-filter-chip.all-chip { border-style: dashed; }
+  #tag-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 60px 10px;
+    min-height: 36px;
+    border-bottom: 1px solid var(--border);
+  }
+  .note-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    cursor: default;
+    font-family: inherit;
+  }
+  .note-tag .tag-remove {
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    font-size: 11px; padding: 0; line-height: 1;
+    transition: color 0.15s;
+  }
+  .note-tag .tag-remove:hover { color: var(--danger); }
+  #tag-input-wrap { display: flex; align-items: center; gap: 4px; }
+  #tag-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px dashed var(--border);
+    color: var(--muted);
+    font-size: 11px; font-family: inherit;
+    outline: none; width: 90px; padding: 1px 4px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  #tag-input:focus { border-color: var(--accent); color: var(--text); }
+  #tag-input::placeholder { color: var(--border); }
+  .note-tags-preview { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+  .note-tag-pill {
+    font-size: 10px; padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--surface2);
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+  body.focus-mode #tag-bar { display: none; }
+
+
+  /* ── GOOGLE DRIVE BUTTON ── */
+  #btn-gdrive {
+    width: 100%;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 7px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  #btn-gdrive:hover  { border-color: #4285f4; color: #4285f4; }
+  #btn-gdrive.connected { border-color: var(--success); color: var(--success); }
+
+  /* ── GOOGLE DRIVE MODAL ── */
+  #gdrive-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,14,12,0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  #gdrive-modal.open { display: flex; }
+  #gdrive-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 32px;
+    min-width: 360px;
+    max-width: 440px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  #gdrive-box h3 {
+    font-family: 'Playfair Display', serif;
+    color: #4285f4;
+    margin-bottom: 8px;
+    font-size: 18px;
+  }
+  .gdrive-steps {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 2;
+    margin-bottom: 14px;
+    background: var(--bg);
+    padding: 10px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    display: none;
+  }
+  .gdrive-steps.open { display: block; }
+  #gdrive-connected-view { display: none; text-align: center; }
+  #gdrive-connected-view .check { font-size: 36px; margin-bottom: 8px; }
+
+
+  /* ── PWA INSTALL ── */
+  #btn-install {
+    display: none;
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: background 0.2s;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  #btn-install:hover { background: var(--accent2); color: #fff; }
+  #btn-install.visible { display: block; }
+
+  /* ── SETTINGS MODAL ── */
+  #settings-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,14,12,0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #settings-modal.open { display: flex; }
+
+  #settings-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 28px 32px;
+    min-width: 380px;
+    max-width: 440px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  #settings-box h3 {
+    font-family: 'Playfair Display', serif;
+    color: var(--accent);
+    margin-bottom: 20px;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .setting-group {
+    margin-bottom: 20px;
+  }
+
+  .setting-label {
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0.7;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .setting-select {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .setting-select:focus { border-color: var(--accent); }
+
+  .setting-hint {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 5px;
+    line-height: 1.5;
+    opacity: 0.8;
+  }
+
+  .font-preview {
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    min-height: 42px;
+  }
+
+  .size-slider {
+    flex: 1;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .size-value {
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 32px;
+    text-align: right;
+  }
+
+  .save-location-wrap {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+
+  .save-location-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .save-location-input:focus { border-color: var(--accent); }
+
+  .settings-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 18px 0;
+  }
+
+  /* ── THEME CHIPS ── */
+  .theme-chip {
+    cursor: pointer;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+    transition: border-color 0.2s, transform 0.15s;
+    width: 80px;
+  }
+
+  .theme-chip:hover { transform: translateY(-2px); }
+  .theme-chip.active { border-color: var(--accent); }
+
+  .theme-chip-preview {
+    height: 44px;
+    display: flex;
+    gap: 0;
+  }
+
+  .theme-chip-dark { background: #0f0e0c; }
+  .theme-chip-light { background: #faf9f7; }
+
+  .theme-chip-dark .chip-sidebar {
+    width: 28px; height: 100%;
+    background: #1a1916;
+    border-right: 1px solid #2e2c28;
+    flex-shrink: 0;
+  }
+
+  .theme-chip-dark .chip-body {
+    flex: 1;
+    background: #0f0e0c;
+  }
+
+  .theme-chip-light .chip-sidebar {
+    width: 28px; height: 100%;
+    background: #f2f0ec;
+    border-right: 1px solid #d6d0c8;
+    flex-shrink: 0;
+  }
+
+  .theme-chip-light .chip-body {
+    flex: 1;
+    background: #faf9f7;
+  }
+
+  .theme-chip-label {
+    font-size: 11px;
+    text-align: center;
+    padding: 4px 0;
+    color: var(--muted);
+    background: var(--surface2);
+  }
+
+  .theme-chip.active .theme-chip-label { color: var(--accent); }
+
+  /* ── SETTINGS COG BUTTON ── */
+  #btn-settings {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 4px 6px;
+    border-radius: 3px;
+    transition: color 0.15s, transform 0.3s;
+    line-height: 1;
+  }
+
+  #btn-settings:hover { color: var(--accent); transform: rotate(45deg); }
+
+  /* ── MOBILE ── */
+  #mobile-toggle {
+    display: none;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 50;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  @media (max-width: 640px) {
+    #mobile-toggle { display: block; }
+    #sidebar {
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      transform: translateX(-100%);
+    }
+    #sidebar.mobile-open { transform: translateX(0); }
+    #editor { padding: 12px 20px 40px; }
+    #note-title-input { padding: 20px 20px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<button id="mobile-toggle" onclick="toggleMobileSidebar()">☰</button>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div id="app-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>Write<span>Pad</span></span>
+      <button id="btn-settings" onclick="openSettings()" title="Settings">⚙</button>
+    </div>
+    <div id="search-wrap">
+      <span id="search-icon">⌕</span>
+      <input id="search" type="text" placeholder="Search notes…" oninput="filterNotes(this.value)"/>
+    </div>
+  </div>
+
+  <div id="tag-filter-section" class="tag-filter-section" style="display:none;">
+    <div class="tag-filter-label">🏷 Filter by tag</div>
+    <div class="tag-filter-list" id="tag-filter-list"></div>
+  </div>
+
+  <div id="notes-list"></div>
+
+  <div id="sidebar-footer">
+    <button id="btn-install" onclick="installPWA()">⬇ Install WritePad App</button>
+    <button id="btn-new" onclick="newNote()">+ New Note &nbsp;<small style="opacity:.6">Ctrl+D</small></button>
+    <div id="sync-section">
+      <div id="sync-status">
+        <span class="sync-dot" id="sync-dot"></span>
+        <span id="sync-label">Local only</span>
+      </div>
+      <button id="btn-gdrive" onclick="openGdriveModal()">
+        ◈ Connect Google Drive
+      </button>
+      <button id="btn-pcloud" onclick="openPcloudModal()" style="margin-top:6px;">
+        ☁ Connect pCloud Sync
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- EDITOR -->
+<div id="editor-pane">
+  <div id="toolbar">
+    <button class="tb-btn" onclick="insertMd('**','**')" title="Bold">B</button>
+    <button class="tb-btn" onclick="insertMd('*','*')" title="Italic"><i>I</i></button>
+    <button class="tb-btn" onclick="insertMd('`','`')" title="Code">{'`'}</button>
+    <button class="tb-btn" onclick="insertLinePrefix('# ')" title="Heading">H1</button>
+    <button class="tb-btn" onclick="insertLinePrefix('## ')" title="Heading 2">H2</button>
+    <button class="tb-btn" onclick="insertLinePrefix('- ')" title="List">—</button>
+    <button class="tb-btn" onclick="insertLinePrefix('> ')" title="Quote">❝</button>
+    <button class="tb-btn focus-mode-btn" onclick="toggleFocus()" title="Focus mode (Ctrl+Shift+F)">⊡</button>
+    <button class="tb-btn" onclick="exportNote()" title="Export this note">↓</button>
+    <button class="tb-btn" onclick="writeAllNotesToFolder()" title="Save all to folder now">💾</button>
+    <button class="tb-btn" onclick="toggleShortcuts()" title="Shortcuts">?</button>
+    <a class="tb-btn" href="https://github.com/WriterSanjoy/writepad/blob/main/Documentation.md" target="_blank" title="Documentation" style="text-decoration:none;">📄</a>
+    <span id="word-count">0 words</span>
+  </div>
+
+  <div id="editor-area" style="display:none;">
+    <input id="note-title-input" type="text" placeholder="Untitled" oninput="onTitleChange()"/>
+    <div id="tag-bar" style="display:none;"></div>
+    <textarea id="editor" placeholder="Start writing…" oninput="onEditorChange()"></textarea>
+  </div>
+
+  <div id="empty-state">
+    <h2>Nothing here yet</h2>
+    <p>Press <kbd>Ctrl+D</kbd> to create your first note</p>
+  </div>
+</div>
+
+<!-- SHORTCUTS PANEL -->
+<div id="shortcuts-panel" onclick="closeShortcuts(event)">
+  <div id="shortcuts-box">
+    <h3>Keyboard Shortcuts</h3>
+    <div class="shortcut-row"><span>New note</span><kbd>Ctrl + D</kbd></div>
+    <div class="shortcut-row"><span>Search notes</span><kbd>Ctrl + F</kbd></div>
+    <div class="shortcut-row"><span>Focus mode</span><kbd>Ctrl + Shift + F</kbd></div>
+    <div class="shortcut-row"><span>Export note</span><kbd>Ctrl + E</kbd></div>
+    <div class="shortcut-row"><span>Sync to Google Drive</span><kbd>Ctrl + G</kbd></div>
+    <div class="shortcut-row"><span>Delete note</span><kbd>Ctrl + Backspace</kbd></div>
+    <div class="shortcut-row"><span>Close panel</span><kbd>Esc</kbd></div>
+  </div>
+</div>
+
+
+<!-- GOOGLE DRIVE MODAL -->
+<div id="gdrive-modal" onclick="closeGdriveModal(event)">
+  <div id="gdrive-box">
+    <h3>◈ Google Drive Sync</h3>
+
+    <!-- Setup view -->
+    <div id="gdrive-setup-view">
+      <p style="color:var(--muted);font-size:12px;margin-bottom:12px;line-height:1.6;">
+        A free Google OAuth Client ID is needed once — takes ~5 min.<br>
+        <a href="#" onclick="document.getElementById('gdrive-how').classList.toggle('open');return false;"
+           style="color:#4285f4;text-decoration:none;font-size:11px;">How to get one ▾</a>
+      </p>
+      <div id="gdrive-how" class="gdrive-steps">
+        <b style="color:#4285f4;">1</b> &nbsp;Go to <a href="https://console.cloud.google.com/" target="_blank" style="color:#4285f4;">console.cloud.google.com</a><br>
+        <b style="color:#4285f4;">2</b> &nbsp;New project → any name (e.g. <em>WritePad</em>)<br>
+        <b style="color:#4285f4;">3</b> &nbsp;APIs &amp; Services → Enable APIs → <b>Google Drive API</b> → Enable<br>
+        <b style="color:#4285f4;">4</b> &nbsp;Credentials → Create Credentials → <b>OAuth client ID</b><br>
+        <b style="color:#4285f4;">5</b> &nbsp;Configure consent screen if prompted → External → save<br>
+        <b style="color:#4285f4;">6</b> &nbsp;Application type: <b>Web application</b><br>
+        <b style="color:#4285f4;">7</b> &nbsp;Authorised JavaScript origins → Add:<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<code style="background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:10px;">https://writersanjoy.github.io</code><br>
+        <b style="color:#4285f4;">8</b> &nbsp;Copy the <b>Client ID</b> → paste below<br>
+        <b style="color:#4285f4;">✓</b> &nbsp;<em>No scope changes needed in Console — app uses only drive.file</em>
+      </div>
+
+      <input class="modal-input" id="gdrive-client-id" type="text"
+        placeholder="Paste Client ID  (ends in .apps.googleusercontent.com)"
+        style="font-size:11px;"/>
+      <div id="gdrive-msg" style="font-size:11px;color:var(--muted);margin-bottom:8px;min-height:16px;line-height:1.7;"></div>
+      <button class="modal-btn primary" onclick="connectGdrive()"
+        style="background:#4285f4;border:none;">Sign in with Google</button>
+    </div>
+
+    <!-- Connected view -->
+    <div id="gdrive-connected-view">
+      <div class="check">✓</div>
+      <div style="color:var(--success);font-size:13px;margin-bottom:4px;font-weight:600;">Connected to Google Drive</div>
+      <div id="gdrive-user-email" style="font-size:11px;color:var(--muted);margin-bottom:20px;"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+        Notes sync automatically as <b>.md files</b> in<br>
+        <code style="background:var(--surface2);padding:1px 6px;border-radius:3px;">My Drive / WritePad /</code>
+      </div>
+      <div id="gdrive-folder-info" style="font-size:10px;color:var(--muted);margin-bottom:14px;background:var(--bg);padding:6px 10px;border-radius:3px;word-break:break-all;"></div>
+      <button class="modal-btn primary" onclick="gdriveSyncAllDebug()" style="margin-bottom:8px;">↑ Sync All Now</button>
+      <button class="modal-btn secondary" onclick="gdriveDisconnect()">Disconnect</button>
+    </div>
+
+    <button class="modal-btn secondary" style="margin-top:8px;" onclick="closeGdriveModal()">Close</button>
+  </div>
+</div>
+
+<!-- PCLOUD MODAL -->
+<div id="pcloud-modal" onclick="closePcloudModal(event)">
+  <div id="pcloud-box">
+    <h3>pCloud Sync</h3>
+    <p style="margin-bottom:14px;">Generate a free API token from pCloud — takes 30 seconds:</p>
+
+    <div style="font-size:11px;color:var(--muted);line-height:2;margin-bottom:16px;background:var(--bg);padding:10px 12px;border-radius:4px;border:1px solid var(--border);">
+      <b style="color:var(--accent);">Step 1</b> &nbsp;Go to
+      <a href="https://my.pcloud.com" target="_blank" style="color:var(--accent);">my.pcloud.com</a>
+      and log in<br>
+      <b style="color:var(--accent);">Step 2</b> &nbsp;Click your avatar → <b>Settings</b> → <b>Security</b><br>
+      <b style="color:var(--accent);">Step 3</b> &nbsp;Scroll to <b>"API Tokens"</b> → click <b>Generate</b><br>
+      <b style="color:var(--accent);">Step 4</b> &nbsp;Copy the token and paste it below
+    </div>
+
+    <input class="modal-input" id="pcloud-token" type="text" placeholder="Paste your pCloud API token here…" style="font-size:11px;letter-spacing:0.3px;"/>
+    <div id="pcloud-msg" style="font-size:11px;color:var(--muted);margin-bottom:10px;max-height:100px;overflow-y:auto;line-height:1.7;background:var(--bg);padding:6px 8px;border-radius:3px;min-height:0;"></div>
+    <button class="modal-btn primary" onclick="connectPcloud()">Connect</button>
+    <button class="modal-btn secondary" onclick="disconnectPcloud()">Disconnect & forget token</button>
+    <button class="modal-btn secondary" onclick="closePcloudModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settings-modal" onclick="closeSettings(event)">
+  <div id="settings-box">
+    <h3>⚙ Settings</h3>
+
+    <!-- SAVE LOCATION -->
+    <div class="setting-group">
+      <div class="setting-label">📁 Auto-Save Folder</div>
+      <div id="setting-location-display" style="font-size:12px;color:var(--accent);margin-bottom:10px;min-height:18px;">No folder selected</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="modal-btn primary" style="width:auto;padding:7px 14px;margin:0;"
+          onclick="pickSaveFolder()">📂 Choose Folder…</button>
+        <button class="modal-btn secondary" style="width:auto;padding:7px 14px;margin:0;"
+          onclick="clearSaveFolder()">✕ Clear</button>
+      </div>
+      <div class="setting-hint" style="margin-top:10px;">
+        Point this to your <b>pCloud Drive\WritePad</b> folder.
+        Notes are written as <b>.md files automatically when you close or switch tabs</b> — no manual export needed.
+        Permission is asked once per browser session.
+      </div>
+      <button class="modal-btn secondary" style="margin-top:10px;width:auto;padding:7px 16px;"
+        onclick="exportAllNotes()">⬇ Export All Now (manual)</button>
+    </div>
+
+    <hr class="settings-divider"/>
+
+    <!-- FONT FAMILY -->
+    <div class="setting-group">
+      <div class="setting-label">🔤 Editor Font</div>
+      <select class="setting-select" id="setting-font" onchange="applyFont(this.value)">
+        <optgroup label="── Monospace">
+          <option value="'JetBrains Mono', monospace">JetBrains Mono (default)</option>
+        </optgroup>
+        <optgroup label="── Serif">
+          <option value="'Playfair Display', serif">Playfair Display</option>
+          <option value="'Merriweather', serif">Merriweather</option>
+          <option value="'Lora', serif">Lora</option>
+          <option value="Georgia, serif">Georgia</option>
+          <option value="'Times New Roman', serif">Times New Roman</option>
+        </optgroup>
+        <optgroup label="── Sans-serif">
+          <option value="'Source Sans 3', sans-serif">Source Sans 3</option>
+          <option value="Arial, sans-serif">Arial</option>
+          <option value="Verdana, sans-serif">Verdana</option>
+          <option value="Tahoma, sans-serif">Tahoma</option>
+          <option value="Calibri, sans-serif">Calibri</option>
+        </optgroup>
+        <optgroup label="── Bengali / Unicode">
+          <option value="'Noto Serif Bengali', serif">Noto Serif Bengali</option>
+          <option value="'Hind Siliguri', sans-serif">Hind Siliguri (Kalpurush-style)</option>
+          <option value="Vrinda, 'Noto Serif Bengali', serif">Vrinda</option>
+          <option value="'Shonar Bangla', 'Noto Serif Bengali', serif">Shonar Bangla</option>
+        </optgroup>
+      </select>
+      <div class="font-preview" id="font-preview">
+        The quick brown fox jumps over the lazy dog.<br>
+        আমার সোনার বাংলা আমি তোমায় ভালোবাসি।
+      </div>
+    </div>
+
+    <hr class="settings-divider"/>
+
+    <!-- FONT SIZE -->
+    <div class="setting-group">
+      <div class="setting-label">🔠 Font Size</div>
+      <div class="setting-row">
+        <span style="font-size:11px;color:var(--muted);">12px</span>
+        <input class="size-slider" type="range" id="setting-size"
+          min="12" max="26" step="1" value="15" oninput="applySize(this.value)"/>
+        <span style="font-size:11px;color:var(--muted);">26px</span>
+        <span class="size-value" id="size-display">15px</span>
+      </div>
+      <div class="font-preview" id="size-preview" style="margin-top:8px;">
+        Start writing your thoughts here…<br>এখানে লিখুন।
+      </div>
+    </div>
+
+    <hr class="settings-divider"/>
+
+    <!-- THEME -->
+    <div class="setting-group">
+      <div class="setting-label">🎨 Theme</div>
+      <div id="theme-toggle-wrap" style="display:flex;gap:10px;">
+        <div class="theme-chip" id="chip-dark" onclick="applyTheme('dark')">
+          <div class="theme-chip-preview theme-chip-dark">
+            <span class="chip-sidebar"></span>
+            <span class="chip-body"></span>
+          </div>
+          <div class="theme-chip-label">Dark</div>
+        </div>
+        <div class="theme-chip" id="chip-light" onclick="applyTheme('light')">
+          <div class="theme-chip-preview theme-chip-light">
+            <span class="chip-sidebar"></span>
+            <span class="chip-body"></span>
+          </div>
+          <div class="theme-chip-label">Light</div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="settings-divider"/>
+    <button class="modal-btn secondary" onclick="closeSettings()">Close</button>
+    <div style="margin-top:14px;text-align:center;border-top:1px solid var(--border);padding-top:12px;">
+      <a href="https://github.com/WriterSanjoy/writepad/blob/main/Documentation.md"
+         target="_blank"
+         style="font-size:11px;color:var(--muted);text-decoration:none;transition:color 0.15s;"
+         onmouseover="this.style.color='var(--accent)'"
+         onmouseout="this.style.color='var(--muted)'">
+        📄 View full documentation →
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════
+//  STATE
+// ═══════════════════════════════
+let notes = {};           // { id: {title, body, updated, tags:[]} }
+let activeId = null;
+let saveTimer = null;
+let pcloudToken = null;
+let pcloudFilter = '';
+let activeTag = null;
+
+// Settings state
+let settings = {
+  font: "'JetBrains Mono', monospace",
+  size: 15,
+  theme: 'light'
+};
+
+// ═══════════════════════════════
+//  INIT
+// ═══════════════════════════════
+function init() {
+  loadFromStorage();
+  loadSettings();
+  pcloudToken = localStorage.getItem('writepad_pcloud_token');
+  pcloudEndpoint = localStorage.getItem('writepad_pcloud_endpoint') || 'https://api.pcloud.com';
+  if (pcloudToken) updateSyncUI(true);
+  gdriveInit();
+  renderList();
+  if (Object.keys(notes).length === 0) newNote();
+  else openNote(Object.keys(notes)[0]);
+}
+
+// ═══════════════════════════════
+//  STORAGE (IndexedDB-backed via localStorage JSON)
+// ═══════════════════════════════
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem('writepad_notes');
+    notes = raw ? JSON.parse(raw) : {};
+    Object.values(notes).forEach(n => { if (!n.tags) n.tags = []; });
+  } catch { notes = {}; }
+}
+
+function saveToStorage() {
+  localStorage.setItem('writepad_notes', JSON.stringify(notes));
+  if (pcloudToken && activeId) schedulePcloudSync();
+  gdriveScheduleSync();
+}
+
+// ═══════════════════════════════
+//  NOTES CRUD
+// ═══════════════════════════════
+function newNote() {
+  const id = 'note_' + Date.now();
+  notes[id] = { title: '', body: '', updated: Date.now(), tags: [] };
+  saveToStorage();
+  renderList();
+  openNote(id);
+  document.getElementById('note-title-input').focus();
+}
+
+function openNote(id) {
+  activeId = id;
+  const n = notes[id];
+  if (!n) return;
+  document.getElementById('note-title-input').value = n.title;
+  document.getElementById('editor').value = n.body;
+  document.getElementById('editor-area').style.display = 'flex';
+  document.getElementById('empty-state').style.display = 'none';
+  updateWordCount();
+  renderTagBar();
+  renderList();
+}
+
+function deleteNote(id, e) {
+  e.stopPropagation();
+  delete notes[id];
+  saveToStorage();
+  if (activeId === id) {
+    activeId = null;
+    const remaining = Object.keys(notes);
+    if (remaining.length > 0) openNote(remaining[0]);
+    else {
+      document.getElementById('editor-area').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'flex';
+    }
+  }
+  renderList();
+  toast('Note deleted');
+}
+
+function onTitleChange() {
+  if (!activeId) return;
+  notes[activeId].title = document.getElementById('note-title-input').value;
+  notes[activeId].updated = Date.now();
+  scheduleSave();
+}
+
+function onEditorChange() {
+  if (!activeId) return;
+  notes[activeId].body = document.getElementById('editor').value;
+  notes[activeId].updated = Date.now();
+  updateWordCount();
+  scheduleSave();
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveToStorage();
+    renderList();
+  }, 400);
+}
+
+// ═══════════════════════════════
+//  RENDER
+// ═══════════════════════════════
+function renderList() {
+  const q = pcloudFilter.toLowerCase();
+  const list = document.getElementById('notes-list');
+  let entries = Object.entries(notes);
+  if (q) entries = entries.filter(([,n]) =>
+    n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q) ||
+    (n.tags||[]).some(t => t.toLowerCase().includes(q))
+  );
+  if (activeTag) entries = entries.filter(([,n]) => (n.tags||[]).includes(activeTag));
+  entries.sort((a, b) => b[1].updated - a[1].updated);
+  if (entries.length === 0) {
+    list.innerHTML = '<div style="padding:20px 16px;color:var(--muted);font-size:11px;">No notes found</div>';
+    return;
+  }
+  list.innerHTML = entries.map(([id, n]) => {
+    const title   = n.title || 'Untitled';
+    const preview = n.body.replace(/\n/g, ' ').slice(0, 60);
+    const date    = new Date(n.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const tagPills = (n.tags||[]).map(t => `<span class="note-tag-pill">${esc(t)}</span>`).join('');
+    return `
+      <div class="note-item ${id === activeId ? 'active' : ''}" onclick="openNote('${id}')">
+        <div class="note-title">${esc(title)}</div>
+        <div class="note-preview">${esc(preview) || '<em>Empty</em>'}</div>
+        ${tagPills ? `<div class="note-tags-preview">${tagPills}</div>` : ''}
+        <div class="note-date">${date}</div>
+        <button class="note-delete" onclick="deleteNote('${id}', event)" title="Delete">✕</button>
+      </div>`;
+  }).join('');
+  renderTagFilter();
+}
+
+function filterNotes(q) {
+  pcloudFilter = q;
+  renderList();
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════
+//  TAG SYSTEM
+// ═══════════════════════════════
+function getAllTags() {
+  const set = new Set();
+  Object.values(notes).forEach(n => (n.tags||[]).forEach(t => set.add(t)));
+  return [...set].sort();
+}
+function renderTagFilter() {
+  const tags = getAllTags();
+  const section = document.getElementById('tag-filter-section');
+  const list    = document.getElementById('tag-filter-list');
+  if (tags.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  const allChip = `<button class="tag-filter-chip all-chip ${!activeTag?'active':''}" onclick="setTagFilter(null)">All</button>`;
+  const chips = tags.map(t =>
+    `<button class="tag-filter-chip ${activeTag===t?'active':''}" onclick="setTagFilter('${esc(t)}')">${esc(t)} <span style="opacity:.5;font-size:10px;">${countNotesWithTag(t)}</span></button>`
+  ).join('');
+  list.innerHTML = allChip + chips;
+}
+function countNotesWithTag(tag) {
+  return Object.values(notes).filter(n => (n.tags||[]).includes(tag)).length;
+}
+function setTagFilter(tag) { activeTag = tag; renderList(); }
+function renderTagBar() {
+  const bar = document.getElementById('tag-bar');
+  if (!activeId) { bar.style.display='none'; return; }
+  bar.style.display = 'flex';
+  const tags = notes[activeId].tags || [];
+  const pills = tags.map(t => `<span class="note-tag">${esc(t)}<button class="tag-remove" onclick="removeTag('${esc(t)}')" title="Remove">×</button></span>`).join('');
+  bar.innerHTML = pills + `<div id="tag-input-wrap"><input id="tag-input" type="text" placeholder="+ add tag" maxlength="30" onkeydown="handleTagInput(event)" onfocus="showTagSuggestions()" oninput="showTagSuggestions()" onblur="hideTagSuggestions()"/></div><div id="tag-suggestions" style="display:none;position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:4px 0;z-index:50;min-width:120px;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>`;
+}
+function handleTagInput(e) {
+  if (e.key==='Enter'||e.key===',') { e.preventDefault(); const v=e.target.value.trim().replace(/^#+/,'').replace(/,/g,'').trim(); if(v) addTag(v); }
+  if (e.key==='Escape') { e.target.value=''; hideTagSuggestions(); e.target.blur(); }
+}
+function addTag(tag) {
+  if (!activeId) return;
+  const clean = tag.toLowerCase().trim().replace(/\s+/g,'-');
+  if (!clean) return;
+  if (!notes[activeId].tags) notes[activeId].tags=[];
+  if (notes[activeId].tags.includes(clean)) { renderTagBar(); return; }
+  notes[activeId].tags.push(clean);
+  notes[activeId].updated = Date.now();
+  saveToStorage(); renderTagBar(); renderList();
+  const inp = document.getElementById('tag-input');
+  if (inp) inp.value = '';
+}
+function removeTag(tag) {
+  if (!activeId) return;
+  notes[activeId].tags = (notes[activeId].tags||[]).filter(t=>t!==tag);
+  notes[activeId].updated = Date.now();
+  saveToStorage(); renderTagBar(); renderList();
+}
+function showTagSuggestions() {
+  const inp=document.getElementById('tag-input');
+  const box=document.getElementById('tag-suggestions');
+  if(!inp||!box) return;
+  const val=inp.value.trim().toLowerCase().replace(/^#+/,'');
+  const curr=notes[activeId]?.tags||[];
+  const matches=getAllTags().filter(t=>!curr.includes(t)&&(!val||t.includes(val)));
+  if(matches.length===0){box.style.display='none';return;}
+  const rect=inp.getBoundingClientRect();
+  box.style.top=(rect.bottom+4)+'px'; box.style.left=rect.left+'px'; box.style.display='block';
+  box.innerHTML=matches.map(t=>`<div style="padding:5px 12px;cursor:pointer;font-size:11px;color:var(--text);" onmousedown="event.preventDefault();addTag('${esc(t)}')" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${esc(t)}</div>`).join('');
+}
+function hideTagSuggestions() {
+  setTimeout(()=>{ const b=document.getElementById('tag-suggestions'); if(b) b.style.display='none'; },150);
+}
+
+// ═══════════════════════════════
+//  WORD COUNT
+// ═══════════════════════════════
+function updateWordCount() {
+  const body = document.getElementById('editor').value;
+  const words = body.trim() ? body.trim().split(/\s+/).length : 0;
+  document.getElementById('word-count').textContent = words + ' word' + (words !== 1 ? 's' : '');
+}
+
+// ═══════════════════════════════
+//  MARKDOWN HELPERS
+// ═══════════════════════════════
+function insertMd(before, after) {
+  const ta = document.getElementById('editor');
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  const sel = ta.value.slice(s, e);
+  ta.setRangeText(before + sel + after, s, e, 'end');
+  ta.focus();
+  if (!sel) ta.selectionStart = ta.selectionEnd = s + before.length;
+  onEditorChange();
+}
+
+function insertLinePrefix(prefix) {
+  const ta = document.getElementById('editor');
+  const s = ta.selectionStart;
+  const lineStart = ta.value.lastIndexOf('\n', s - 1) + 1;
+  ta.setRangeText(prefix, lineStart, lineStart, 'end');
+  ta.focus();
+  onEditorChange();
+}
+
+// ═══════════════════════════════
+//  EXPORT
+// ═══════════════════════════════
+function exportNote() {
+  if (!activeId) return;
+  const n = notes[activeId];
+  const content = (n.title ? n.title + '\n' + '='.repeat(n.title.length) + '\n\n' : '') + n.body;
+  const blob = new Blob([content], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (n.title || 'note') + '.md';
+  a.click();
+  toast('Note exported');
+}
+
+// ═══════════════════════════════
+//  FOCUS MODE
+// ═══════════════════════════════
+function toggleFocus() {
+  document.body.classList.toggle('focus-mode');
+  toast(document.body.classList.contains('focus-mode') ? 'Focus mode on — press Ctrl+Shift+F to exit' : 'Focus mode off');
+}
+
+// ═══════════════════════════════
+//  SHORTCUTS
+// ═══════════════════════════════
+function toggleShortcuts() {
+  document.getElementById('shortcuts-panel').classList.toggle('open');
+}
+
+function closeShortcuts(e) {
+  if (e.target.id === 'shortcuts-panel') document.getElementById('shortcuts-panel').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('shortcuts-panel').classList.remove('open');
+    document.getElementById('pcloud-modal').classList.remove('open');
+    document.getElementById('settings-modal').classList.remove('open');
+    closeGdriveModal();
+    if (document.body.classList.contains('focus-mode')) toggleFocus();
+  }
+  if (e.ctrlKey && e.key === 'd') { e.preventDefault(); newNote(); }
+  if (e.ctrlKey && e.key === 'f') { e.preventDefault(); document.getElementById('search').focus(); }
+  if (e.ctrlKey && e.key === 'e') { e.preventDefault(); exportNote(); }
+  if (e.ctrlKey && e.shiftKey && e.key === 'F') { e.preventDefault(); toggleFocus(); }
+  if (e.ctrlKey && e.key === 'g') { e.preventDefault(); gdriveSyncAll(); }
+  if (e.ctrlKey && e.key === 'Backspace' && document.activeElement.id === 'editor') {
+    e.preventDefault(); if (activeId) deleteNote(activeId, { stopPropagation: ()=>{} });
+  }
+});
+
+// ═══════════════════════════════
+//  TOAST
+// ═══════════════════════════════
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+
+// ═══════════════════════════════
+//  GOOGLE DRIVE SYNC
+// ═══════════════════════════════
+const GD_SCOPE    = 'https://www.googleapis.com/auth/drive email profile';
+const GD_API      = 'https://www.googleapis.com/drive/v3';
+const GD_UPLOAD   = 'https://www.googleapis.com/upload/drive/v3';
+
+let gdToken      = null;   // OAuth access token (1hr lifetime)
+let gdClientId   = null;   // stored in localStorage
+let gdFolderId   = null;   // WritePad folder id
+let gdFileMap    = {};     // { noteId → driveFileId }
+let gdUserEmail  = '';
+let gdSyncTimer  = null;
+
+// ── Persist / restore ────────────────────────────────────
+function gdriveSave() {
+  localStorage.setItem('wp_gd_cid',    gdClientId   || '');
+  localStorage.setItem('wp_gd_token',  gdToken      || '');
+  localStorage.setItem('wp_gd_folder', gdFolderId   || '');
+  localStorage.setItem('wp_gd_email',  gdUserEmail  || '');
+  localStorage.setItem('wp_gd_fmap',   JSON.stringify(gdFileMap));
+}
+
+function gdriveInit() {
+  gdClientId  = localStorage.getItem('wp_gd_cid')    || null;
+  gdToken     = localStorage.getItem('wp_gd_token')  || null;
+  gdFolderId  = localStorage.getItem('wp_gd_folder') || null;
+  gdUserEmail = localStorage.getItem('wp_gd_email')  || '';
+  try { gdFileMap = JSON.parse(localStorage.getItem('wp_gd_fmap') || '{}'); } catch { gdFileMap={}; }
+
+  // If scope was upgraded (drive.file → drive), clear old token to force re-auth
+  const savedScope = localStorage.getItem('wp_gd_scope') || '';
+  const currentScope = 'drive';
+  if (gdToken && !savedScope.includes(currentScope)) {
+    console.log('GDrive: scope upgraded, clearing old token to force re-auth');
+    gdToken = null;
+    gdFolderId = null;
+    gdFileMap = {};
+    localStorage.removeItem('wp_gd_token');
+    localStorage.removeItem('wp_gd_folder');
+    localStorage.removeItem('wp_gd_fmap');
+  }
+  localStorage.setItem('wp_gd_scope', currentScope);
+
+  if (gdToken && gdClientId) gdriveUpdateUI(true);
+}
+
+// ── Modal open / close ────────────────────────────────────
+function openGdriveModal() {
+  const modal = document.getElementById('gdrive-modal');
+  modal.style.display = 'flex';
+  modal.classList.add('open');
+  if (gdToken) {
+    document.getElementById('gdrive-setup-view').style.display     = 'none';
+    document.getElementById('gdrive-connected-view').style.display = 'block';
+    document.getElementById('gdrive-user-email').textContent       = gdUserEmail;
+    document.getElementById('gdrive-folder-info').textContent      = gdFolderId
+      ? 'Folder ID: ' + gdFolderId
+      : 'No folder ID — will create on next sync';
+  } else {
+    document.getElementById('gdrive-setup-view').style.display     = 'block';
+    document.getElementById('gdrive-connected-view').style.display = 'none';
+    if (gdClientId) document.getElementById('gdrive-client-id').value = gdClientId;
+  }
+}
+
+function closeGdriveModal(e) {
+  if (!e || e.target.id === 'gdrive-modal') {
+    document.getElementById('gdrive-modal').classList.remove('open');
+    document.getElementById('gdrive-modal').style.display = 'none';
+  }
+}
+
+// ── OAuth2 popup flow ─────────────────────────────────────
+function connectGdrive() {
+  const cid = document.getElementById('gdrive-client-id').value.trim();
+  const msg = document.getElementById('gdrive-msg');
+  if (!cid) { msg.textContent = 'Please paste your Client ID.'; return; }
+  if (!cid.includes('.apps.googleusercontent.com')) {
+    msg.textContent = 'That does not look like a valid Client ID.'; return;
+  }
+  gdClientId = cid;
+  msg.textContent = 'Opening Google sign-in…';
+  gdriveOAuth();
+}
+
+function gdriveOAuth() {
+  const redirect = window.location.origin + window.location.pathname;
+  const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+    client_id:    gdClientId,
+    redirect_uri: redirect,
+    response_type:'token',
+    scope:        GD_SCOPE,
+    prompt:       'select_account'
+  });
+  const popup = window.open(url, 'gd_auth', 'width=520,height=640,left=200,top=80');
+  const poll  = setInterval(() => {
+    try {
+      if (!popup || popup.closed) { clearInterval(poll); return; }
+      const hash = popup.location.hash;
+      if (hash && hash.includes('access_token')) {
+        clearInterval(poll);
+        popup.close();
+        const p = new URLSearchParams(hash.slice(1));
+        gdToken = p.get('access_token');
+        const exp = parseInt(p.get('expires_in') || '3600');
+        // Auto re-auth 2 min before expiry
+        setTimeout(gdriveReAuth, (exp - 120) * 1000);
+        gdriveOnToken();
+      }
+    } catch {}
+  }, 600);
+}
+
+// Silent re-auth — popup opens and closes automatically (~2 sec)
+function gdriveReAuth() {
+  if (!gdClientId) return;
+  const redirect = window.location.origin + window.location.pathname;
+  const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+    client_id:    gdClientId,
+    redirect_uri: redirect,
+    response_type:'token',
+    scope:        GD_SCOPE,
+    prompt:       'none'   // silent — no user interaction needed
+  });
+  const popup = window.open(url, 'gd_reauth', 'width=1,height=1,left=-100,top=-100');
+  const poll  = setInterval(() => {
+    try {
+      if (!popup || popup.closed) { clearInterval(poll); return; }
+      const hash = popup.location.hash;
+      if (hash && hash.includes('access_token')) {
+        clearInterval(poll);
+        popup.close();
+        const p  = new URLSearchParams(hash.slice(1));
+        gdToken  = p.get('access_token');
+        const exp = parseInt(p.get('expires_in') || '3600');
+        setTimeout(gdriveReAuth, (exp - 120) * 1000);
+        gdriveSave();
+        toast('Google Drive: session refreshed ✓');
+      }
+    } catch {}
+  }, 600);
+}
+
+async function gdriveOnToken() {
+  // Step 1: Get user email
+  try {
+    const r    = await gdfetch('https://www.googleapis.com/oauth2/v3/userinfo');
+    const data = await r.json();
+    gdUserEmail = data.email || 'Google user';
+  } catch { gdUserEmail = 'Google user'; }
+
+  // Step 2: Get or create WritePad folder
+  try {
+    gdFolderId = await gdriveEnsureFolder();
+    console.log('GDrive: folder ready:', gdFolderId);
+  } catch(e) {
+    console.error('GDrive folder error:', e.message);
+    toast('Drive error: ' + e.message);
+    // Still mark connected so user can retry sync manually
+    gdriveSave();
+    gdriveUpdateUI(true);
+    closeGdriveModal();
+    return;
+  }
+
+  gdriveSave();
+  gdriveUpdateUI(true);
+  closeGdriveModal();
+  toast('Google Drive connected — ' + gdUserEmail + ' ✓');
+  await gdriveSyncAll();
+}
+
+// ── Authenticated fetch ───────────────────────────────────
+function gdfetch(url, opts = {}) {
+  opts.headers = { ...(opts.headers || {}), Authorization: 'Bearer ' + gdToken };
+  return fetch(url, opts);
+}
+
+// ── Folder ────────────────────────────────────────────────
+async function gdriveEnsureFolder() {
+  // Step 1: Search Drive for existing WritePad folder (requires drive scope)
+  const q = "name='WritePad' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+  const r = await gdfetch(`${GD_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error('Folder search failed ' + r.status + ': ' + JSON.stringify(err));
+  }
+  const d = await r.json();
+  if (d.files && d.files.length > 0) {
+    console.log('GDrive: found existing folder', d.files[0].id);
+    return d.files[0].id;
+  }
+
+  // Step 2: No folder found — create one
+  const cr = await gdfetch(`${GD_API}/files`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({
+      name:     'WritePad',
+      mimeType: 'application/vnd.google-apps.folder'
+    })
+  });
+  if (!cr.ok) {
+    const err = await cr.json().catch(() => ({}));
+    throw new Error('Folder create failed ' + cr.status + ': ' + JSON.stringify(err));
+  }
+  const cd = await cr.json();
+  console.log('GDrive: created new folder', cd.id);
+  return cd.id;
+}
+
+// ── Upload single note ────────────────────────────────────
+async function gdriveUploadNote(id, note) {
+  if (!gdToken || !gdFolderId) return;
+  const filename = (note.title || id).replace(/[\/:*?"<>|]/g,'_').trim() + '.md';
+  const content  = noteToText(note);
+  const existId  = gdFileMap[id];
+
+  if (existId) {
+    // Update existing file — simple media upload
+    const r = await gdfetch(`${GD_UPLOAD}/files/${existId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'text/plain' },
+      body: content
+    });
+    if (!r.ok) throw new Error('Update failed: ' + r.status);
+  } else {
+    // Create new file — multipart upload using Blob/FormData approach
+    // Build proper multipart body with real CRLF (not escaped)
+    const CRLF  = '\r\n';
+    const boundary = 'writepad_' + Math.random().toString(36).slice(2);
+    const meta  = JSON.stringify({ name: filename, parents: [gdFolderId] });
+
+    // Build as Uint8Array to guarantee real CRLF
+    const enc   = new TextEncoder();
+    const parts = [
+      `--${boundary}${CRLF}`,
+      `Content-Type: application/json${CRLF}${CRLF}`,
+      `${meta}${CRLF}`,
+      `--${boundary}${CRLF}`,
+      `Content-Type: text/plain${CRLF}${CRLF}`,
+      `${content}${CRLF}`,
+      `--${boundary}--`
+    ];
+    const bodyStr  = parts.join('');
+    const bodyBlob = new Blob([enc.encode(bodyStr)], {
+      type: `multipart/related; boundary=${boundary}`
+    });
+
+    const r = await fetch(`${GD_UPLOAD}/files?uploadType=multipart&fields=id`, {
+      method:  'POST',
+      headers: { Authorization: 'Bearer ' + gdToken },
+      body:    bodyBlob
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error('Create failed: ' + r.status + ' ' + JSON.stringify(d));
+    if (d.id) { gdFileMap[id] = d.id; gdriveSave(); }
+  }
+}
+
+// ── Sync all ──────────────────────────────────────────────
+async function gdriveSyncAll() {
+  if (!gdToken) { toast('Connect Google Drive first'); return; }
+  if (!gdFolderId) gdFolderId = await gdriveEnsureFolder();
+  const dot   = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  dot.className = 'sync-dot syncing';
+  label.textContent = 'Syncing to Drive…';
+  let ok = 0, fail = 0;
+  const errors = [];
+  for (const [id, note] of Object.entries(notes)) {
+    try { await gdriveUploadNote(id, note); ok++; }
+    catch(e) { fail++; errors.push(e.message); }
+  }
+  gdriveSave();
+  dot.className     = fail ? 'sync-dot error' : 'sync-dot synced';
+  label.textContent = fail
+    ? `Drive: ${ok} synced, ${fail} failed`
+    : `Drive synced · ${new Date().toLocaleTimeString()}`;
+  if (fail) {
+    toast(`Drive sync: ${ok} ok, ${fail} failed — check console`);
+    console.error('GDrive sync errors:', errors);
+  } else {
+    toast(`Google Drive: ${ok} note${ok!==1?'s':''} synced ✓`);
+  }
+}
+
+// ── Auto-sync on edit (2s debounce) ──────────────────────
+function gdriveScheduleSync() {
+  if (!gdToken || !activeId || !gdFolderId) return;
+  clearTimeout(gdSyncTimer);
+  gdSyncTimer = setTimeout(async () => {
+    try {
+      await gdriveUploadNote(activeId, notes[activeId]);
+      document.getElementById('sync-dot').className    = 'sync-dot synced';
+      document.getElementById('sync-label').textContent = 'Drive · ' + new Date().toLocaleTimeString();
+    } catch(e) {
+      document.getElementById('sync-dot').className    = 'sync-dot error';
+      document.getElementById('sync-label').textContent = 'Drive sync failed';
+      console.error('GDrive upload error:', e.message);
+    }
+  }, 2000);
+}
+
+// ── Debug sync (shows result in modal) ──────────────────
+async function gdriveSyncAllDebug() {
+  const info = document.getElementById('gdrive-folder-info');
+  if (!gdToken) { info.textContent = '✗ No token — reconnect'; return; }
+  if (!gdFolderId) {
+    info.textContent = 'Getting folder…';
+    try {
+      gdFolderId = await gdriveEnsureFolder();
+      gdriveSave();
+    } catch(e) {
+      info.textContent = '✗ Folder error: ' + e.message;
+      return;
+    }
+  }
+  info.textContent = 'Syncing… folder: ' + gdFolderId;
+  let ok = 0, fail = 0;
+  const errs = [];
+  for (const [id, note] of Object.entries(notes)) {
+    try { await gdriveUploadNote(id, note); ok++; }
+    catch(e) { fail++; errs.push((note.title||id) + ': ' + e.message); }
+  }
+  gdriveSave();
+  if (fail === 0) {
+    info.textContent = '✓ Synced ' + ok + ' note' + (ok!==1?'s':'') + ' to folder ' + gdFolderId;
+    document.getElementById('sync-dot').className = 'sync-dot synced';
+    document.getElementById('sync-label').textContent = 'Drive synced · ' + new Date().toLocaleTimeString();
+  } else {
+    info.innerHTML = '✗ ' + fail + ' failed:<br>' + errs.join('<br>');
+    document.getElementById('sync-dot').className = 'sync-dot error';
+    console.error('Sync errors:', errs);
+  }
+}
+
+// ── Disconnect ────────────────────────────────────────────
+function gdriveDisconnect() {
+  gdToken=null; gdClientId=null; gdFolderId=null; gdFileMap={}; gdUserEmail='';
+  ['wp_gd_cid','wp_gd_token','wp_gd_folder','wp_gd_email','wp_gd_fmap']
+    .forEach(k => localStorage.removeItem(k));
+  gdriveUpdateUI(false);
+  closeGdriveModal();
+  toast('Disconnected from Google Drive');
+}
+
+// ── UI ────────────────────────────────────────────────────
+function gdriveUpdateUI(connected) {
+  const btn   = document.getElementById('btn-gdrive');
+  const dot   = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  if (connected) {
+    btn.textContent = '✓ Google Drive';
+    btn.className   = 'connected';
+    dot.className   = 'sync-dot synced';
+    label.textContent = 'Drive connected';
+  } else {
+    btn.textContent = '◈ Connect Google Drive';
+    btn.className   = '';
+    dot.className   = 'sync-dot';
+    label.textContent = 'Local only';
+  }
+}
+
+// ═══════════════════════════════
+//  PCLOUD SYNC
+// ═══════════════════════════════
+function openPcloudModal() {
+  document.getElementById('pcloud-modal').classList.add('open');
+}
+
+function closePcloudModal(e) {
+  if (!e || e.target.id === 'pcloud-modal') document.getElementById('pcloud-modal').classList.remove('open');
+}
+
+// ── JSONP helper (bypasses CORS entirely) ──────────
+function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cb = 'wp_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 15000);
+    function cleanup() { clearTimeout(timer); try { delete window[cb]; } catch{} script.remove(); }
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error('Network error')); };
+    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb;
+    document.head.appendChild(script);
+  });
+}
+
+// SHA1 for digest auth (pCloud's secure login method)
+async function sha1hex(str) {
+  const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// pCloud has two regional endpoints
+const PCLOUD_ENDPOINTS = ['https://api.pcloud.com', 'https://eapi.pcloud.com'];
+let pcloudEndpoint = 'https://api.pcloud.com';
+
+async function connectPcloud() {
+  const token = document.getElementById('pcloud-token').value.trim();
+  const msg = document.getElementById('pcloud-msg');
+  if (!token) { msg.textContent = 'Please paste your token.'; return; }
+  msg.textContent = '';
+
+  for (const endpoint of PCLOUD_ENDPOINTS) {
+    const label = endpoint.includes('eapi') ? 'EU' : 'US';
+    pcloudLog(msg, `Trying ${label} server…`);
+    try {
+      const r = await fetch(`${endpoint}/userinfo?auth=${encodeURIComponent(token)}`);
+      const data = await r.json();
+      if (data.result === 0) {
+        pcloudToken    = token;
+        pcloudEndpoint = endpoint;
+        localStorage.setItem('writepad_pcloud_token',    pcloudToken);
+        localStorage.setItem('writepad_pcloud_endpoint', endpoint);
+        pcloudLog(msg, `✓ Connected as ${data.email}`);
+        updateSyncUI(true);
+        await syncAllToPcloud();
+        setTimeout(() => closePcloudModal(), 1500);
+        return;
+      } else {
+        pcloudLog(msg, `result=${data.result} ${data.error||''}`);
+      }
+    } catch(e) {
+      pcloudLog(msg, `${label} failed: ${e.message}`);
+    }
+  }
+  msg.innerHTML += '<br><b>✗ Token invalid or expired — try generating a new one.</b>';
+}
+
+function disconnectPcloud() {
+  pcloudToken = null;
+  localStorage.removeItem('writepad_pcloud_token');
+  localStorage.removeItem('writepad_pcloud_endpoint');
+  updateSyncUI(false);
+  closePcloudModal();
+  toast('Disconnected from pCloud');
+}
+
+function updateSyncUI(connected) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  const btn = document.getElementById('btn-pcloud');
+  if (connected) {
+    dot.className = 'sync-dot synced';
+    label.textContent = 'pCloud synced';
+    btn.textContent = '✓ pCloud Connected';
+    btn.className = 'connected';
+    btn.style.cssText = 'width:100%;padding:7px;border-radius:4px;font-family:inherit;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;background:none;border:1px solid var(--success);color:var(--success);transition:all 0.2s;';
+  } else {
+    dot.className = 'sync-dot';
+    label.textContent = 'Local only';
+    btn.textContent = '☁ Connect pCloud Sync';
+    btn.style.cssText = '';
+    btn.className = '';
+  }
+}
+
+let syncQueue = [];
+let syncing = false;
+
+function schedulePcloudSync() {
+  if (!pcloudToken || !activeId) return;
+  if (!syncQueue.includes(activeId)) syncQueue.push(activeId);
+  if (!syncing) processSyncQueue();
+}
+
+async function processSyncQueue() {
+  if (syncQueue.length === 0) { syncing = false; return; }
+  syncing = true;
+  document.getElementById('sync-dot').className = 'sync-dot syncing';
+  const id = syncQueue.shift();
+  const n = notes[id];
+  if (n) {
+    try {
+      await pcloudUpload(id, n);
+      document.getElementById('sync-label').textContent = 'Synced ' + new Date().toLocaleTimeString();
+      document.getElementById('sync-dot').className = 'sync-dot synced';
+    } catch {
+      document.getElementById('sync-label').textContent = 'Sync failed';
+      document.getElementById('sync-dot').className = 'sync-dot error';
+    }
+  }
+  setTimeout(processSyncQueue, 300);
+}
+
+function noteToText(note) {
+  const tagLine = (note.tags||[]).length ? 'Tags: ' + note.tags.join(', ') + '\n\n' : '';
+  return (note.title ? note.title + '\n' + '='.repeat(note.title.length) + '\n\n' : '') + tagLine + note.body;
+}
+
+async function pcloudUpload(id, note) {
+  const filename = id + '.md';
+  const content = noteToText(note);
+  // Use JSONP-compatible uploadfile with content as URL param (small notes)
+  // For larger notes, encode as base64 data URI approach
+  const blob = new Blob([content], { type: 'text/plain' });
+  const fd = new FormData();
+  fd.append('file', new File([blob], filename, { type: 'text/plain' }));
+  // uploadfile supports CORS from https origins (GitHub Pages qualifies)
+  const res = await fetch(
+    `${pcloudEndpoint}/uploadfile?path=%2FWritePad&filename=${encodeURIComponent(filename)}&auth=${encodeURIComponent(pcloudToken)}&nopartial=1&renameifexists=0`,
+    { method: 'POST', body: fd }
+  );
+  if (!res.ok) throw new Error('Upload failed ' + res.status);
+}
+
+async function pcloudEnsureFolder() {
+  await jsonp(`${pcloudEndpoint}/createfolderifnotexists?path=%2FWritePad&auth=${encodeURIComponent(pcloudToken)}`);
+}
+
+async function syncAllToPcloud() {
+  if (!pcloudToken) return;
+  try {
+    await pcloudEnsureFolder();
+    for (const [id, note] of Object.entries(notes)) {
+      try { await pcloudUpload(id, note); } catch {}
+    }
+    toast('All notes synced to pCloud ✓');
+  } catch { toast('Sync error — check connection'); }
+}
+
+// ═══════════════════════════════
+//  MOBILE
+// ═══════════════════════════════
+function toggleMobileSidebar() {
+  document.getElementById('sidebar').classList.toggle('mobile-open');
+}
+
+// ═══════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem('writepad_settings');
+    if (raw) settings = { ...settings, ...JSON.parse(raw) };
+  } catch {}
+  applyFont(settings.font, false);
+  applySize(settings.size, false);
+  applyTheme(settings.theme, false);
+  // Restore folder handle from IndexedDB
+  loadDirHandle().then(handle => {
+    if (handle) dirHandle = handle;
+  });
+}
+
+function saveSettings() {
+  localStorage.setItem('writepad_settings', JSON.stringify(settings));
+  closeSettings();
+  toast('Settings saved ✓');
+}
+
+function openSettings() {
+  document.getElementById('setting-font').value = settings.font;
+  document.getElementById('setting-size').value = settings.size;
+  document.getElementById('size-display').textContent = settings.size + 'px';
+  // Show current folder name
+  const el = document.getElementById('setting-location-display');
+  el.textContent = dirHandle ? '📁 ' + dirHandle.name : 'No folder selected';
+  // Mark active theme chip
+  document.getElementById('chip-dark').classList.toggle('active', settings.theme === 'dark');
+  document.getElementById('chip-light').classList.toggle('active', settings.theme === 'light');
+  updateFontPreview();
+  updateSizePreview();
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function applyTheme(theme, save = true) {
+  settings.theme = theme;
+  document.body.classList.toggle('theme-light', theme === 'light');
+  // Update chips if settings panel is open
+  const dc = document.getElementById('chip-dark');
+  const lc = document.getElementById('chip-light');
+  if (dc) dc.classList.toggle('active', theme === 'dark');
+  if (lc) lc.classList.toggle('active', theme === 'light');
+}
+
+function closeSettings(e) {
+  if (!e || e.target.id === 'settings-modal')
+    document.getElementById('settings-modal').classList.remove('open');
+}
+
+function applyFont(font, save = true) {
+  settings.font = font;
+  document.getElementById('editor').style.fontFamily = font;
+  document.getElementById('note-title-input').style.fontFamily = font;
+  if (save) updateFontPreview();
+}
+
+function applySize(size, save = true) {
+  settings.size = parseInt(size);
+  document.getElementById('editor').style.fontSize = size + 'px';
+  document.getElementById('size-display').textContent = size + 'px';
+  if (save) updateSizePreview();
+}
+
+function updateFontPreview() {
+  const font = document.getElementById('setting-font').value;
+  const p = document.getElementById('font-preview');
+  p.style.fontFamily = font;
+}
+
+function updateSizePreview() {
+  const size = document.getElementById('setting-size').value;
+  const p = document.getElementById('size-preview');
+  p.style.fontSize = size + 'px';
+  p.style.fontFamily = document.getElementById('setting-font').value;
+  document.getElementById('size-display').textContent = size + 'px';
+}
+
+// Export ALL notes as individual .md files (zipped via manual loop)
+async function exportAllNotes() {
+  const entries = Object.entries(notes);
+  if (entries.length === 0) { toast('No notes to export'); return; }
+
+  // Export each note individually (browser can't zip without library)
+  let count = 0;
+  for (const [id, note] of entries) {
+    const content = (note.title ? note.title + '\n' + '='.repeat(note.title.length) + '\n\n' : '') + note.body;
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (note.title || id).replace(/[\\/:*?"<>|]/g, '_') + '.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    count++;
+    await new Promise(r => setTimeout(r, 200)); // small delay between downloads
+  }
+  toast(`Exported ${count} note${count !== 1 ? 's' : ''} ✓`);
+}
+
+// ═══════════════════════════════
+//  FILE SYSTEM ACCESS (auto-save to local folder)
+// ═══════════════════════════════
+let dirHandle = null;   // FileSystemDirectoryHandle, persisted in IndexedDB
+
+// Open IndexedDB to store the directory handle across sessions
+function openHandleDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('writepad_fs', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('handles');
+    req.onsuccess = e => res(e.target.result);
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+async function saveDirHandle(handle) {
+  const db = await openHandleDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').put(handle, 'dir');
+    tx.oncomplete = res; tx.onerror = e => rej(e.target.error);
+  });
+}
+
+async function loadDirHandle() {
+  try {
+    const db = await openHandleDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('handles', 'readonly');
+      const req = tx.objectStore('handles').get('dir');
+      req.onsuccess = e => res(e.target.result || null);
+      req.onerror   = e => rej(e.target.error);
+    });
+  } catch { return null; }
+}
+
+async function clearDirHandle() {
+  const db = await openHandleDB();
+  return new Promise((res) => {
+    const tx = db.transaction('handles', 'readwrite');
+    tx.objectStore('handles').delete('dir');
+    tx.oncomplete = res;
+  });
+}
+
+// Ask user to pick a folder (called from Settings)
+async function pickSaveFolder() {
+  if (!window.showDirectoryPicker) {
+    toast('Your browser does not support folder access. Use Edge or Chrome.');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'writepad' });
+    dirHandle = handle;
+    await saveDirHandle(handle);
+    const el = document.getElementById('setting-location-display');
+    if (el) el.textContent = '📁 ' + handle.name;
+    toast('Folder set: ' + handle.name + ' — notes will auto-save on close ✓');
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Could not access folder: ' + e.message);
+  }
+}
+
+async function clearSaveFolder() {
+  dirHandle = null;
+  await clearDirHandle();
+  const el = document.getElementById('setting-location-display');
+  if (el) el.textContent = 'No folder selected';
+  toast('Auto-save folder cleared');
+}
+
+// Write all notes to the folder (silently, overwrites existing)
+async function writeAllNotesToFolder() {
+  if (!dirHandle) return;
+  try {
+    // Re-verify permission (required after browser restart)
+    const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') return;
+    for (const [id, note] of Object.entries(notes)) {
+      const filename = (note.title || id).replace(/[\\/:*?"<>|]/g, '_').trim() + '.md';
+      const content  = (note.title ? note.title + '\n' + '='.repeat(note.title.length) + '\n\n' : '') + note.body;
+      try {
+        const fh = await dirHandle.getFileHandle(filename, { create: true });
+        const w  = await fh.createWritable();
+        await w.write(content);
+        await w.close();
+      } catch {}
+    }
+  } catch {}
+}
+
+// Auto-save hooks — fires when tab is hidden or page is closed
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') writeAllNotesToFolder();
+});
+window.addEventListener('pagehide', () => writeAllNotesToFolder());
+
+
+// ═══════════════════════════════
+//  PWA — SERVICE WORKER + INSTALL
+// ═══════════════════════════════
+let pwaInstallPrompt = null;
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+// Capture install prompt (Chrome/Edge show this before user installs)
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  pwaInstallPrompt = e;
+  // Show install button
+  const btn = document.getElementById('btn-install');
+  if (btn) btn.classList.add('visible');
+});
+
+// Hide install button once app is installed
+window.addEventListener('appinstalled', () => {
+  pwaInstallPrompt = null;
+  const btn = document.getElementById('btn-install');
+  if (btn) btn.classList.remove('visible');
+  toast('WritePad installed successfully ✓');
+});
+
+function installPWA() {
+  if (!pwaInstallPrompt) {
+    toast('App is already installed or browser does not support install');
+    return;
+  }
+  pwaInstallPrompt.prompt();
+  pwaInstallPrompt.userChoice.then(choice => {
+    if (choice.outcome === 'accepted') {
+      toast('Installing WritePad…');
+    }
+    pwaInstallPrompt = null;
+  });
+}
+
+// ═══════════════════════════════
+//  START
+// ═══════════════════════════════
+init();
+</script>
+</body>
+</html>
