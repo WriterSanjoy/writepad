@@ -1,0 +1,31 @@
+{
+  "name": "WritePad",
+  "short_name": "WritePad",
+  "description": "A minimalist offline-first note-taking app with cloud sync",
+  "start_url": "/writepad/",
+  "scope": "/writepad/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#faf9f7",
+  "theme_color": "#8a5f20",
+  "lang": "en",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%238a5f20'/%3E%3Ctext x='256' y='340' font-family='Georgia,serif' font-size='280' font-weight='bold' font-style='italic' text-anchor='middle' fill='%23faf9f7'%3EW%3C/text%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Note",
+      "short_name": "New",
+      "description": "Create a new note",
+      "url": "/writepad/"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
