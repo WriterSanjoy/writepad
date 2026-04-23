@@ -1011,6 +1011,7 @@
     <div class="shortcut-row"><span>Focus mode</span><kbd>Ctrl + Shift + F</kbd></div>
     <div class="shortcut-row"><span>Export note</span><kbd>Ctrl + E</kbd></div>
     <div class="shortcut-row"><span>Sync to Google Drive</span><kbd>Ctrl + G</kbd></div>
+    <div class="shortcut-row"><span>Import from Google Drive</span><kbd>Ctrl + Shift + I</kbd></div>
     <div class="shortcut-row"><span>Delete note</span><kbd>Ctrl + Backspace</kbd></div>
     <div class="shortcut-row"><span>Close panel</span><kbd>Esc</kbd></div>
   </div>
@@ -1060,7 +1061,9 @@
         <code style="background:var(--surface2);padding:1px 6px;border-radius:3px;">My Drive / WritePad /</code>
       </div>
       <div id="gdrive-folder-info" style="font-size:10px;color:var(--muted);margin-bottom:14px;background:var(--bg);padding:6px 10px;border-radius:3px;word-break:break-all;"></div>
-      <button class="modal-btn primary" onclick="gdriveSyncAllDebug()" style="margin-bottom:8px;">↑ Sync All Now</button>
+      <button class="modal-btn primary" onclick="gdriveSyncAllDebug()" style="margin-bottom:8px;">↑ Push to Drive (this device → Drive)</button>
+      <button class="modal-btn primary" onclick="gdriveImportAll()" style="margin-bottom:8px;background:var(--success);border:none;">↓ Pull from Drive (Drive → this device)</button>
+      <div id="gdrive-import-status" style="font-size:11px;color:var(--muted);margin-bottom:10px;min-height:16px;line-height:1.7;text-align:left;background:var(--bg);padding:6px 10px;border-radius:3px;display:none;"></div>
       <button class="modal-btn secondary" onclick="gdriveDisconnect()">Disconnect</button>
     </div>
 
@@ -1514,6 +1517,7 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'e') { e.preventDefault(); exportNote(); }
   if (e.ctrlKey && e.shiftKey && e.key === 'F') { e.preventDefault(); toggleFocus(); }
   if (e.ctrlKey && e.key === 'g') { e.preventDefault(); gdriveSyncAll(); }
+  if (e.ctrlKey && e.shiftKey && e.key === 'I') { e.preventDefault(); gdriveImportAll(); }
   if (e.ctrlKey && e.key === 'Backspace' && document.activeElement.id === 'editor') {
     e.preventDefault(); if (activeId) deleteNote(activeId, { stopPropagation: ()=>{} });
   }
@@ -1588,6 +1592,7 @@ function openGdriveModal() {
     document.getElementById('gdrive-setup-view').style.display     = 'none';
     document.getElementById('gdrive-connected-view').style.display = 'block';
     document.getElementById('gdrive-user-email').textContent       = gdUserEmail;
+    document.getElementById('gdrive-import-status').style.display  = 'none';
     document.getElementById('gdrive-folder-info').textContent      = gdFolderId
       ? 'Folder ID: ' + gdFolderId
       : 'No folder ID — will create on next sync';
@@ -1868,6 +1873,141 @@ async function gdriveSyncAllDebug() {
     document.getElementById('sync-dot').className = 'sync-dot error';
     console.error('Sync errors:', errs);
   }
+}
+
+
+// ── Import all notes from Drive → this device ────────────
+async function gdriveImportAll() {
+  const status = document.getElementById('gdrive-import-status');
+  status.style.display = 'block';
+  status.textContent   = 'Reading notes from Drive…';
+
+  if (!gdToken) { status.textContent = '✗ Not connected.'; return; }
+  if (!gdFolderId) {
+    status.textContent = 'Finding folder…';
+    try { gdFolderId = await gdriveEnsureFolder(); gdriveSave(); }
+    catch(e) { status.textContent = '✗ ' + e.message; return; }
+  }
+
+  // Step 1: List all .md files in the WritePad folder
+  let files;
+  try {
+    const q   = `'${gdFolderId}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'`;
+    const r   = await gdfetch(`${GD_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&pageSize=200`);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      status.textContent = '✗ Could not list files: ' + r.status + ' ' + JSON.stringify(err);
+      return;
+    }
+    const d = await r.json();
+    files   = d.files || [];
+  } catch(e) {
+    status.textContent = '✗ Network error: ' + e.message;
+    return;
+  }
+
+  if (files.length === 0) {
+    status.textContent = 'No notes found in Drive / WritePad folder.';
+    return;
+  }
+
+  status.textContent = `Found ${files.length} file${files.length!==1?'s':''} — importing…`;
+
+  // Step 2: Download each file and merge into localStorage
+  let imported = 0, skipped = 0, failed = 0;
+  const importLog = [];
+
+  for (const file of files) {
+    try {
+      // Download file content
+      const r = await gdfetch(`${GD_API}/files/${file.id}?alt=media`);
+      if (!r.ok) { failed++; continue; }
+      const content = await r.text();
+
+      // Parse title and body from .md content
+      // Format: "Title
+======
+
+Tags: x, y
+
+Body"  OR just body
+      let title = file.name.replace(/\.md$/, '');
+      let body  = content;
+      let tags  = [];
+
+      // Extract title from first line if it matches our export format
+      const lines = content.split('\n');
+      if (lines.length >= 2 && lines[1].match(/^=+$/)) {
+        title = lines[0].trim();
+        body  = lines.slice(2).join('\n').trim();
+      }
+
+      // Extract tags line if present
+      const tagMatch = body.match(/^Tags: (.+)\n\n/);
+      if (tagMatch) {
+        tags = tagMatch[1].split(',').map(t => t.trim()).filter(Boolean);
+        body = body.replace(/^Tags: .+\n\n/, '');
+      }
+
+      // Check if note already exists locally by matching title
+      const existingEntry = Object.entries(notes).find(([,n]) => n.title === title);
+
+      if (existingEntry) {
+        const [existingId, existingNote] = existingEntry;
+        const driveModified = new Date(file.modifiedTime).getTime();
+
+        if (driveModified > existingNote.updated) {
+          // Drive version is newer — update local
+          notes[existingId].body    = body;
+          notes[existingId].tags    = tags.length ? tags : (existingNote.tags || []);
+          notes[existingId].updated = driveModified;
+          // Update file map
+          gdFileMap[existingId] = file.id;
+          imported++;
+          importLog.push('↻ Updated: ' + title);
+        } else {
+          // Local version is newer — skip
+          skipped++;
+          importLog.push('→ Kept local: ' + title);
+        }
+      } else {
+        // New note — create it
+        const newId = 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        notes[newId] = {
+          title,
+          body,
+          tags,
+          updated: new Date(file.modifiedTime).getTime()
+        };
+        gdFileMap[newId] = file.id;
+        imported++;
+        importLog.push('+ Added: ' + title);
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise(r => setTimeout(r, 100));
+
+    } catch(e) {
+      failed++;
+      importLog.push('✗ Failed: ' + file.name);
+    }
+  }
+
+  // Save everything
+  saveToStorage();
+  gdriveSave();
+  renderList();
+
+  // Show result
+  const summary = `✓ ${imported} imported/updated, ${skipped} kept local, ${failed} failed`;
+  status.innerHTML = summary + '<br><small style="opacity:.7">' +
+    importLog.slice(0, 8).join('<br>') +
+    (importLog.length > 8 ? `<br>…and ${importLog.length - 8} more` : '') +
+    '</small>';
+
+  document.getElementById('sync-dot').className   = 'sync-dot synced';
+  document.getElementById('sync-label').textContent = 'Drive imported · ' + new Date().toLocaleTimeString();
+  toast(`Drive import: ${imported} note${imported!==1?'s':''} imported ✓`);
 }
 
 // ── Disconnect ────────────────────────────────────────────
