@@ -1933,12 +1933,7 @@ async function gdriveImportAll() {
       const content = await r.text();
 
       // Parse title and body from .md content
-      // Format: "Title
-======
-
-Tags: x, y
-
-Body"  OR just body
+      // Format: Title / ====== / Tags: x,y / Body
       let title = file.name.replace(/\.md$/, '');
       let body  = content;
       let tags  = [];
