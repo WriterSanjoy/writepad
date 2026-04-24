@@ -1,7 +1,7 @@
 // WritePad Service Worker
 // Provides offline support by caching the app shell
 
-const CACHE_NAME = 'writepad-v1';
+const CACHE_NAME = 'writepad-v2';
 
 // Files to cache on install
 const SHELL_FILES = [
