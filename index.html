@@ -1757,7 +1757,15 @@ async function gdriveUploadNote(id, note) {
   const existId  = gdFileMap[id];
 
   if (existId) {
-    // Update existing file — simple media upload
+    // Step 1: Update filename (metadata) in case title changed
+    const metaR = await gdfetch(`${GD_API}/files/${existId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ name: filename })
+    });
+    if (!metaR.ok) console.warn('GDrive: filename update failed', metaR.status);
+
+    // Step 2: Update content
     const r = await gdfetch(`${GD_UPLOAD}/files/${existId}?uploadType=media`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'text/plain' },
