@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>WritePad</title>
+<!-- WP-VERSION: 2.0-FINAL -->
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json"/>
@@ -1624,7 +1625,7 @@ function connectGdrive() {
 }
 
 function gdriveOAuth() {
-  const redirect = window.location.origin + window.location.pathname;
+  const redirect = 'https://writersanjoy.github.io/writepad/';
   const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
     client_id:    gdClientId,
     redirect_uri: redirect,
@@ -1651,34 +1652,27 @@ function gdriveOAuth() {
   }, 600);
 }
 
-// Silent re-auth — popup opens and closes automatically (~2 sec)
+// Handle token expiry — clear token and prompt user to reconnect
 function gdriveReAuth() {
-  if (!gdClientId) return;
-  const redirect = window.location.origin + window.location.pathname;
-  const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
-    client_id:    gdClientId,
-    redirect_uri: redirect,
-    response_type:'token',
-    scope:        GD_SCOPE,
-    prompt:       'none'   // silent — no user interaction needed
-  });
-  const popup = window.open(url, 'gd_reauth', 'width=1,height=1,left=-100,top=-100');
-  const poll  = setInterval(() => {
-    try {
-      if (!popup || popup.closed) { clearInterval(poll); return; }
-      const hash = popup.location.hash;
-      if (hash && hash.includes('access_token')) {
-        clearInterval(poll);
-        popup.close();
-        const p  = new URLSearchParams(hash.slice(1));
-        gdToken  = p.get('access_token');
-        const exp = parseInt(p.get('expires_in') || '3600');
-        setTimeout(gdriveReAuth, (exp - 120) * 1000);
-        gdriveSave();
-        toast('Google Drive: session refreshed ✓');
-      }
-    } catch {}
-  }, 600);
+  // Called on timer — just mark as needing re-auth, user will see button
+  gdriveHandleExpiry();
+}
+
+function gdriveHandleExpiry() {
+  gdToken = null;
+  localStorage.removeItem('wp_gd_token');
+  // Update UI
+  const dot   = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  const btn   = document.getElementById('btn-gdrive');
+  if (dot)   dot.className     = 'sync-dot error';
+  if (label) label.textContent = 'Drive: session expired';
+  if (btn) {
+    btn.textContent = '⚠ Reconnect Google Drive';
+    btn.style.borderColor = 'var(--danger)';
+    btn.style.color = 'var(--danger)';
+  }
+  toast('Google Drive session expired — click ⚠ Reconnect to continue syncing');
 }
 
 async function gdriveOnToken() {
@@ -1703,6 +1697,8 @@ async function gdriveOnToken() {
     return;
   }
 
+  // Rebuild file map from Drive to avoid duplicates on reconnect
+  await gdriveReconcileFileMap();
   gdriveSave();
   gdriveUpdateUI(true);
   closeGdriveModal();
@@ -1721,6 +1717,7 @@ async function gdriveEnsureFolder() {
   // Step 1: Search Drive for existing WritePad folder (requires drive scope)
   const q = "name='WritePad' and mimeType='application/vnd.google-apps.folder' and trashed=false";
   const r = await gdfetch(`${GD_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name)`);
+  if (r.status === 401) { gdriveHandleExpiry(); throw new Error('Token expired'); }
   if (!r.ok) {
     const err = await r.json().catch(() => ({}));
     throw new Error('Folder search failed ' + r.status + ': ' + JSON.stringify(err));
@@ -1763,6 +1760,8 @@ async function gdriveUploadNote(id, note) {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ name: filename })
     });
+    // 401 = token expired — trigger re-auth
+    if (metaR.status === 401) { gdriveHandleExpiry(); throw new Error('Token expired — reconnecting'); }
     if (!metaR.ok) console.warn('GDrive: filename update failed', metaR.status);
 
     // Step 2: Update content
@@ -1771,6 +1770,7 @@ async function gdriveUploadNote(id, note) {
       headers: { 'Content-Type': 'text/plain' },
       body: content
     });
+    if (r.status === 401) { gdriveHandleExpiry(); throw new Error('Token expired — reconnecting'); }
     if (!r.ok) throw new Error('Update failed: ' + r.status);
   } else {
     // Create new file — multipart upload using Blob/FormData approach
@@ -1883,6 +1883,41 @@ async function gdriveSyncAllDebug() {
   }
 }
 
+
+
+// ── Reconcile file map after reconnect ───────────────────────────────────
+// Scans Drive folder, matches existing .md files to local notes by filename
+// Prevents duplicate file creation after disconnect/reconnect/token expiry
+async function gdriveReconcileFileMap() {
+  if (!gdToken || !gdFolderId) return;
+  try {
+    const q = "'" + gdFolderId + "' in parents and trashed=false";
+    const r = await gdfetch(GD_API + '/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)&pageSize=200');
+    if (!r.ok) return;
+    const d = await r.json();
+    const driveFiles = d.files || [];
+    if (driveFiles.length === 0) return;
+
+    // Build filename → driveFileId map from Drive
+    const driveMap = {};
+    driveFiles.forEach(function(f) { driveMap[f.name] = f.id; });
+
+    // Match each local note to its Drive file by filename
+    let matched = 0;
+    Object.entries(notes).forEach(function(entry) {
+      const id   = entry[0];
+      const note = entry[1];
+      const filename = (note.title || id).replace(/[/:*?"<>|]/g, '_').trim() + '.md';
+      if (driveMap[filename] && !gdFileMap[id]) {
+        gdFileMap[id] = driveMap[filename];
+        matched++;
+      }
+    });
+    if (matched > 0) console.log('GDrive: reconciled ' + matched + ' existing file(s)');
+  } catch(e) {
+    console.warn('GDrive reconcile failed:', e.message);
+  }
+}
 
 // ── Import all notes from Drive → this device ────────────
 async function gdriveImportAll() {
