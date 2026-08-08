@@ -301,7 +301,6 @@
   .tb-btn.active { color: var(--accent); }
 
   #word-count {
-    margin-left: auto;
     font-size: 11px;
     color: var(--text);
     opacity: 0.55;
@@ -701,6 +700,150 @@
   #btn-install:hover { background: var(--accent2); color: #fff; }
   #btn-install.visible { display: block; }
 
+
+  /* ── FULLSCREEN MODE ── */
+  #btn-fullscreen {
+    background: none;
+    border: none;
+    color: var(--text);
+    opacity: 0.6;
+    cursor: pointer;
+    padding: 5px 8px;
+    border-radius: 3px;
+    font-size: 15px;
+    transition: opacity 0.15s, background 0.15s;
+    font-family: inherit;
+    line-height: 1;
+    margin-left: auto;   /* pushes to far right */
+  }
+
+  #btn-fullscreen:hover { opacity: 1; background: var(--surface2); }
+
+  /* Fullscreen overlay — covers everything */
+  body.fullscreen-mode {
+    overflow: hidden;
+  }
+
+  body.fullscreen-mode #sidebar { display: none; }
+
+  #fullscreen-pane {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: var(--bg);
+    flex-direction: column;
+  }
+
+  body.fullscreen-mode #fullscreen-pane { display: flex; }
+
+  /* Fullscreen toolbar — minimal, auto-hides */
+  #fs-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 40px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    opacity: 1;
+    transition: opacity 0.4s ease;
+    flex-shrink: 0;
+  }
+
+  #fs-toolbar.hidden { opacity: 0; pointer-events: none; }
+
+  #fs-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 300px;
+  }
+
+  #fs-word-count {
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.6;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  #fs-exit-btn {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px 12px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+
+  #fs-exit-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Fullscreen editor */
+  #fs-editor-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0 max(60px, calc(50% - 380px));  /* centred column like MS Word */
+  }
+
+  #fs-note-title {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'Playfair Display', serif;
+    font-size: 32px;
+    font-weight: 700;
+    padding: 40px 0 12px;
+    outline: none;
+    width: 100%;
+    caret-color: var(--accent);
+  }
+
+  #fs-note-title::placeholder { color: var(--border); }
+
+  #fs-tag-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0 12px;
+    min-height: 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+
+  #fs-editor {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1.9;
+    outline: none;
+    resize: none;
+    overflow-y: auto;
+    caret-color: var(--accent);
+    padding: 8px 0 60px;
+  }
+
+  #fs-editor::placeholder { color: var(--border); }
+  #fs-editor::-webkit-scrollbar { width: 4px; }
+  #fs-editor::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Page-like appearance in fullscreen */
+  body.fullscreen-mode #fullscreen-pane {
+    background: var(--bg);
+  }
+
   /* ── SETTINGS MODAL ── */
   #settings-modal {
     display: none;
@@ -989,6 +1132,7 @@
     <button class="tb-btn" onclick="toggleShortcuts()" title="Shortcuts">?</button>
     <a class="tb-btn" href="https://github.com/WriterSanjoy/writepad/blob/main/Documentation.md" target="_blank" title="Documentation" style="text-decoration:none;">📄</a>
     <span id="word-count">0 words</span>
+    <button id="btn-fullscreen" onclick="enterFullscreen()" title="Full-screen mode (F11 or Ctrl+Shift+Enter)">⛶</button>
   </div>
 
   <div id="editor-area" style="display:none;">
@@ -1009,6 +1153,7 @@
     <h3>Keyboard Shortcuts</h3>
     <div class="shortcut-row"><span>New note</span><kbd>Ctrl + D</kbd></div>
     <div class="shortcut-row"><span>Search notes</span><kbd>Ctrl + F</kbd></div>
+    <div class="shortcut-row"><span>Full-screen mode</span><kbd>Ctrl + Shift + Enter</kbd></div>
     <div class="shortcut-row"><span>Focus mode</span><kbd>Ctrl + Shift + F</kbd></div>
     <div class="shortcut-row"><span>Export note</span><kbd>Ctrl + E</kbd></div>
     <div class="shortcut-row"><span>Sync to Google Drive</span><kbd>Ctrl + G</kbd></div>
@@ -1092,6 +1237,30 @@
     <button class="modal-btn primary" onclick="connectPcloud()">Connect</button>
     <button class="modal-btn secondary" onclick="disconnectPcloud()">Disconnect & forget token</button>
     <button class="modal-btn secondary" onclick="closePcloudModal()">Cancel</button>
+  </div>
+</div>
+
+
+<!-- FULLSCREEN MODE PANE -->
+<div id="fullscreen-pane">
+  <!-- Minimal toolbar — auto-hides after 2s of no mouse movement -->
+  <div id="fs-toolbar">
+    <button class="tb-btn" onclick="fsInsertMd('**','**')" title="Bold">B</button>
+    <button class="tb-btn" onclick="fsInsertMd('*','*')" title="Italic"><i>I</i></button>
+    <button class="tb-btn" onclick="fsInsertMd('`','`')" title="Code">{'`'}</button>
+    <button class="tb-btn" onclick="fsInsertPrefix('# ')" title="H1">H1</button>
+    <button class="tb-btn" onclick="fsInsertPrefix('## ')" title="H2">H2</button>
+    <button class="tb-btn" onclick="fsInsertPrefix('- ')" title="List">—</button>
+    <span id="fs-title"></span>
+    <span id="fs-word-count">0 words</span>
+    <button id="fs-exit-btn" onclick="exitFullscreen()" title="Exit fullscreen (Esc)">✕ Exit fullscreen</button>
+  </div>
+
+  <!-- Centred writing column -->
+  <div id="fs-editor-wrap">
+    <input id="fs-note-title" type="text" placeholder="Untitled" oninput="fsSyncTitle()"/>
+    <div id="fs-tag-bar"></div>
+    <textarea id="fs-editor" placeholder="Start writing…" oninput="fsSyncContent()"></textarea>
   </div>
 </div>
 
@@ -1507,6 +1676,7 @@ function closeShortcuts(e) {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if (fsActive) { exitFullscreen(); return; }
     document.getElementById('shortcuts-panel').classList.remove('open');
     document.getElementById('pcloud-modal').classList.remove('open');
     document.getElementById('settings-modal').classList.remove('open');
@@ -1518,6 +1688,7 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === 'e') { e.preventDefault(); exportNote(); }
   if (e.ctrlKey && e.shiftKey && e.key === 'F') { e.preventDefault(); toggleFocus(); }
   if (e.ctrlKey && e.key === 'g') { e.preventDefault(); gdriveSyncAll(); }
+  if (e.ctrlKey && e.shiftKey && e.key === 'Enter') { e.preventDefault(); fsActive ? exitFullscreen() : enterFullscreen(); }
   if (e.ctrlKey && e.shiftKey && e.key === 'I') { e.preventDefault(); gdriveImportAll(); }
   if (e.ctrlKey && e.key === 'Backspace' && document.activeElement.id === 'editor') {
     e.preventDefault(); if (activeId) deleteNote(activeId, { stopPropagation: ()=>{} });
@@ -2299,12 +2470,15 @@ function applyFont(font, save = true) {
   settings.font = font;
   document.getElementById('editor').style.fontFamily = font;
   document.getElementById('note-title-input').style.fontFamily = font;
+  document.getElementById('fs-editor').style.fontFamily = font;
+  document.getElementById('fs-note-title').style.fontFamily = font;
   if (save) updateFontPreview();
 }
 
 function applySize(size, save = true) {
   settings.size = parseInt(size);
   document.getElementById('editor').style.fontSize = size + 'px';
+  document.getElementById('fs-editor').style.fontSize = size + 'px';
   document.getElementById('size-display').textContent = size + 'px';
   if (save) updateSizePreview();
 }
@@ -2443,6 +2617,138 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', () => writeAllNotesToFolder());
 
+
+
+// ═══════════════════════════════
+//  FULLSCREEN MODE
+// ═══════════════════════════════
+let fsActive    = false;
+let fsHideTimer = null;
+
+function enterFullscreen() {
+  if (!activeId) { toast('Open a note first'); return; }
+  fsActive = true;
+  document.body.classList.add('fullscreen-mode');
+
+  // Populate fullscreen editor from active note
+  const n = notes[activeId];
+  document.getElementById('fs-note-title').value = n.title || '';
+  document.getElementById('fs-editor').value      = n.body  || '';
+  document.getElementById('fs-title').textContent = n.title || 'Untitled';
+
+  // Sync font and size from settings
+  const fs = document.getElementById('fs-editor');
+  const main = document.getElementById('editor');
+  fs.style.fontFamily = main.style.fontFamily || settings.font;
+  fs.style.fontSize   = main.style.fontSize   || settings.size + 'px';
+
+  // Render tag bar in fullscreen
+  fsSyncTagBar();
+  fsUpdateWordCount();
+
+  // Request browser fullscreen API
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+
+  // Focus editor
+  setTimeout(() => document.getElementById('fs-editor').focus(), 100);
+
+  // Auto-hide toolbar after 3s of inactivity
+  fsResetHideTimer();
+  document.getElementById('fullscreen-pane').addEventListener('mousemove', fsResetHideTimer);
+}
+
+function exitFullscreen() {
+  fsActive = false;
+  document.body.classList.remove('fullscreen-mode');
+  clearTimeout(fsHideTimer);
+
+  // Exit browser fullscreen
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+
+  // Sync back to main editor
+  if (activeId) {
+    notes[activeId].title   = document.getElementById('fs-note-title').value;
+    notes[activeId].body    = document.getElementById('fs-editor').value;
+    notes[activeId].updated = Date.now();
+    document.getElementById('note-title-input').value = notes[activeId].title;
+    document.getElementById('editor').value           = notes[activeId].body;
+    saveToStorage();
+    updateWordCount();
+    renderList();
+  }
+  document.getElementById('editor').focus();
+}
+
+function fsSyncTitle() {
+  if (!activeId) return;
+  const title = document.getElementById('fs-note-title').value;
+  notes[activeId].title   = title;
+  notes[activeId].updated = Date.now();
+  document.getElementById('fs-title').textContent        = title || 'Untitled';
+  document.getElementById('note-title-input').value      = title;
+  scheduleSave();
+}
+
+function fsSyncContent() {
+  if (!activeId) return;
+  notes[activeId].body    = document.getElementById('fs-editor').value;
+  notes[activeId].updated = Date.now();
+  document.getElementById('editor').value = notes[activeId].body;
+  fsUpdateWordCount();
+  scheduleSave();
+}
+
+function fsUpdateWordCount() {
+  const body  = document.getElementById('fs-editor').value;
+  const words = body.trim() ? body.trim().split(/\s+/).length : 0;
+  document.getElementById('fs-word-count').textContent = words + ' word' + (words !== 1 ? 's' : '');
+}
+
+function fsSyncTagBar() {
+  const bar  = document.getElementById('fs-tag-bar');
+  const tags = (notes[activeId] && notes[activeId].tags) || [];
+  if (tags.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  bar.innerHTML = tags.map(t =>
+    `<span class="note-tag">${esc(t)}</span>`
+  ).join('');
+}
+
+function fsResetHideTimer() {
+  const tb = document.getElementById('fs-toolbar');
+  tb.classList.remove('hidden');
+  clearTimeout(fsHideTimer);
+  fsHideTimer = setTimeout(() => tb.classList.add('hidden'), 3000);
+}
+
+function fsInsertMd(before, after) {
+  const ta = document.getElementById('fs-editor');
+  const s  = ta.selectionStart, e = ta.selectionEnd;
+  const sel = ta.value.slice(s, e);
+  ta.setRangeText(before + sel + after, s, e, 'end');
+  ta.focus();
+  if (!sel) ta.selectionStart = ta.selectionEnd = s + before.length;
+  fsSyncContent();
+}
+
+function fsInsertPrefix(prefix) {
+  const ta = document.getElementById('fs-editor');
+  const s  = ta.selectionStart;
+  const lineStart = ta.value.lastIndexOf('\n', s - 1) + 1;
+  ta.setRangeText(prefix, lineStart, lineStart, 'end');
+  ta.focus();
+  fsSyncContent();
+}
+
+// Exit fullscreen on Esc (handled in keydown listener)
+// Exit fullscreen if browser exits (e.g. user presses F11)
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && fsActive) exitFullscreen();
+});
 
 // ═══════════════════════════════
 //  PWA — SERVICE WORKER + INSTALL
